@@ -21,13 +21,14 @@ const BAR_SPACE = CONTROL_HEIGHT + space.md * 2;
  * Scan 10 cables, review, then issue (or return) all of them in one transaction.
  */
 export default function CartScreen() {
-  const params = useLocalSearchParams<{ mode?: Mode }>();
+  const params = useLocalSearchParams<{ mode?: Mode; projectId?: string; review?: string }>();
   const insets = useSafeAreaInsets();
   const headerSpace = useHeaderSpace();
   const [mode, setMode] = useState<Mode>(params.mode ?? 'issue');
   const [status, setStatus] = useState<Status>(null);
   const cart = useCart();
   const listRef = useRef<FlatList<CartEntry>>(null);
+  const returnReview = params.review === '1' && mode === 'return';
 
   const flash = (s: Status) => setStatus(s);
   const clearStatus = useCallback(() => setStatus(null), []);
@@ -104,19 +105,30 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Stack.Screen options={{ title: mode === 'issue' ? 'Issue equipment' : 'Return equipment' }} />
+      <Stack.Screen options={{ title: returnReview ? 'Return to inventory' : mode === 'issue' ? 'Issue equipment' : 'Return equipment' }} />
       <Backdrop />
 
       {/* camera starts below the navigation bar instead of underneath it */}
-      <View style={[styles.cameraWrap, { marginTop: headerSpace }]}>
-        <Scanner onScan={onScan} hint={mode === 'issue' ? 'Scan items to issue' : 'Scan items to return'} compact />
-      </View>
+      {!returnReview ? (
+        <View style={[styles.cameraWrap, { marginTop: headerSpace }]}>
+          <Scanner onScan={onScan} hint={mode === 'issue' ? 'Scan items to issue' : 'Scan items to return'} compact />
+        </View>
+      ) : null}
 
-      <View style={styles.controls}>
-        <Segmented options={[{ value: 'issue', label: 'Issue' }, { value: 'return', label: 'Return' }]} value={mode} onChange={switchMode} />
-        <StatusLine status={status} onDone={clearStatus} />
+      <View style={[styles.controls, returnReview && { paddingTop: headerSpace + space.md }]}>
+        {returnReview ? (
+          <View style={styles.reviewHeader}>
+            <Text style={type.title}>Choose items to return</Text>
+            <Text style={type.caption}>Remove any equipment that is staying with the project, then continue.</Text>
+          </View>
+        ) : (
+          <>
+            <Segmented options={[{ value: 'issue', label: 'Issue' }, { value: 'return', label: 'Return' }]} value={mode} onChange={switchMode} />
+            <StatusLine status={status} onDone={clearStatus} />
+          </>
+        )}
         <View style={styles.listHeader}>
-          <Text style={type.overline}>{cart.entries.length ? `${cart.entries.length} in list` : 'List'}</Text>
+          <Text style={type.overline}>{cart.entries.length ? `${cart.entries.length} selected` : 'No items selected'}</Text>
           {summary ? <Text style={[type.caption, { color: accent }]}>{summary}</Text> : null}
         </View>
       </View>
@@ -131,16 +143,19 @@ export default function CartScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ListEmptyComponent={
-          <Empty icon="scan-outline" text={mode === 'issue' ? 'Scan the QR on each item you’re taking out.' : 'Scan the QR on each item coming back.'} />
+          <Empty
+            icon={returnReview ? 'checkmark-done-outline' : 'scan-outline'}
+            text={returnReview ? 'No equipment selected to return.' : mode === 'issue' ? 'Scan the QR on each item you’re taking out.' : 'Scan the QR on each item coming back.'}
+          />
         }
       />
 
       <BottomBar>
         <Button title="Clear" variant="secondary" icon="trash-outline" onPress={cart.clear} disabled={!cart.entries.length} style={{ flex: 0.42 }} />
         <Button
-          title={cart.entries.length ? `${mode === 'issue' ? 'Issue' : 'Return'} ${cart.entries.length}` : mode === 'issue' ? 'Issue' : 'Return'}
+          title={returnReview ? (cart.entries.length ? `Return ${cart.entries.length} to inventory` : 'Return to inventory') : cart.entries.length ? `${mode === 'issue' ? 'Issue' : 'Return'} ${cart.entries.length}` : mode === 'issue' ? 'Issue' : 'Return'}
           icon={mode === 'issue' ? 'arrow-up' : 'arrow-down'}
-          onPress={() => router.push(`/action?action=${mode}&cart=1`)}
+          onPress={() => router.push(`/action?action=${mode}&cart=1${params.projectId ? `&projectId=${params.projectId}` : ''}`)}
           disabled={!cart.entries.length || hasInvalidQty}
           style={{ flex: 1 }}
         />
@@ -174,6 +189,7 @@ function StatusLine({ status, onDone }: { status: Status; onDone: () => void }) 
 const styles = StyleSheet.create({
   cameraWrap: { height: '32%', marginHorizontal: space.lg, borderRadius: radius.lg, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   controls: { paddingHorizontal: space.lg, paddingTop: space.md },
+  reviewHeader: { gap: space.xs, marginBottom: space.lg },
   statusSlot: { height: 38, justifyContent: 'center', marginBottom: space.xs },
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, borderRadius: radius.sm, paddingHorizontal: space.md },
   statusText: { fontWeight: '600', flex: 1, fontSize: 14 },

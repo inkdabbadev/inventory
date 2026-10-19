@@ -37,6 +37,14 @@
           "cameraPermission": "INK Inventory uses the camera to scan QR codes and barcodes on items and shelves."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "INK Inventory uses your photos to attach product images.",
+          "cameraPermission": "INK Inventory uses the camera to take product photos.",
+          "microphonePermission": false
+        }
+      ],
       "expo-font"
     ],
     "scheme": "inkinventory",

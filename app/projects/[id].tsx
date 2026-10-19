@@ -4,7 +4,7 @@ import { Button, Card, Empty, IconBubble, Row, Screen, SectionTitle } from '../.
 import { HistoryList } from '../../src/components/ItemParts';
 import { useToast } from '../../src/components/Toast';
 import { useFocusQuery } from '../../src/hooks/useRefresh';
-import { fullName, getProject, InventoryError, projectAssets, projectHistory, setProjectStatus } from '../../src/services/inventory';
+import { fmtQty, fullName, getProject, InventoryError, projectAssets, projectHistory, projectStockUsage, setProjectStatus } from '../../src/services/inventory';
 import { useCart } from '../../src/store/cart';
 import { cmyk, colors, space, type } from '../../src/theme';
 
@@ -12,6 +12,7 @@ export default function ProjectDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [project, reloadProject] = useFocusQuery(() => getProject(id), [id]);
   const [out] = useFocusQuery(() => projectAssets(id), [id]);
+  const [stock] = useFocusQuery(() => projectStockUsage(id), [id]);
   const [moves] = useFocusQuery(() => projectHistory(id), [id]);
   const cart = useCart();
   const toast = useToast();
@@ -22,7 +23,7 @@ export default function ProjectDetail() {
   const returnAll = () => {
     cart.clear();
     out.forEach((a) => cart.add({ entityType: 'asset', item: a }));
-    router.push('/action?action=return&cart=1');
+    router.push(`/cart?mode=return&review=1&projectId=${project.id}`);
   };
 
   const toggle = () => {
@@ -58,7 +59,10 @@ export default function ProjectDetail() {
         </View>
       </Card>
 
-      {out.length > 0 ? <Button title={`Return all ${out.length}`} icon="arrow-down" onPress={returnAll} style={{ marginBottom: space.sm }} /> : null}
+      {out.length > 0 ? <Button title={`Review returns · ${out.length}`} icon="arrow-down" onPress={returnAll} style={{ marginBottom: space.sm }} /> : null}
+      {project.status === 'active' ? (
+        <Button title="Add inventory to project" icon="add" onPress={() => router.push(`/project-add?projectId=${project.id}`)} style={{ marginBottom: space.sm }} />
+      ) : null}
 
       <SectionTitle>Equipment out · {out.length}</SectionTitle>
       <Card padded={false}>
@@ -71,6 +75,22 @@ export default function ProjectDetail() {
             subtitle={`${a.code}${a.expected_return ? ` · due ${a.expected_return}` : ''}`}
             onPress={() => router.push(`/asset/${a.id}`)}
             last={i === out.length - 1}
+          />
+        ))}
+      </Card>
+
+      <SectionTitle>Stock allocated · {stock.length}</SectionTitle>
+      <Card padded={false}>
+        {stock.length === 0 ? <Empty icon="layers-outline" text="No quantity stock allocated." /> : stock.map((item, i) => (
+          <Row
+            key={item.lot_id}
+            icon="layers"
+            iconColor={cmyk.cyan}
+            title={fullName(item)}
+            subtitle={`${item.code} · ${fmtQty(item.allocated)} ${item.unit} for this project`}
+            right={<Text style={type.caption}>{fmtQty(item.available)} left</Text>}
+            onPress={() => router.push(`/lot/${item.lot_id}`)}
+            last={i === stock.length - 1}
           />
         ))}
       </Card>

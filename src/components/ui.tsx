@@ -282,7 +282,7 @@ export function Button({
           colors={variant === 'primary' ? gradients.cm : gradients.my}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.button, { height: h }, styles.glowShadow]}
+          style={[styles.button, { height: h }, !disabled && styles.glowShadow]}
         >
           {content}
         </LinearGradient>
@@ -536,7 +536,7 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  button: { borderRadius: radius.md, paddingHorizontal: space.md, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  button: { borderRadius: radius.md, overflow: 'hidden', paddingHorizontal: space.md, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
   buttonInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, maxWidth: '100%' },
   buttonText: { fontSize: 16, fontWeight: '700', letterSpacing: -0.1, flexShrink: 1, textAlign: 'center' },
   label: { ...type.overline, fontSize: 11, marginBottom: 8, marginLeft: 2 },

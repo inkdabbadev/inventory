@@ -6,6 +6,7 @@ import { migrate } from '../src/db/client';
 import { CartProvider } from '../src/store/cart';
 import { ToastProvider } from '../src/components/Toast';
 import { colors } from '../src/theme';
+import { AutoSync } from '../src/components/AutoSync';
 
 // Synchronous: tables exist before the first screen queries them.
 migrate();
@@ -15,6 +16,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ToastProvider>
+          <AutoSync />
           <CartProvider>
             <StatusBar style="light" />
             <Stack
@@ -40,6 +42,8 @@ export default function RootLayout() {
               <Stack.Screen name="locations/index" options={{ title: 'Locations' }} />
               <Stack.Screen name="locations/[id]" options={{ title: 'Location' }} />
               <Stack.Screen name="projects/[id]" options={{ title: 'Project' }} />
+              <Stack.Screen name="project-add" options={{ title: 'Add inventory' }} />
+              <Stack.Screen name="product-photo" options={{ title: 'Product image' }} />
               <Stack.Screen name="audit" options={{ title: 'Shelf audit' }} />
               <Stack.Screen name="import" options={{ title: "Import" }} />
               <Stack.Screen name="categories" options={{ title: "Categories" }} />

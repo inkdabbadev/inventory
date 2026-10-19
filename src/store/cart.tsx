@@ -28,13 +28,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return 'added';
   }, []);
 
-  const remove = useCallback((id: string) => setEntries((prev) => prev.filter((e) => e.item.id !== id)), []);
+  const remove = useCallback((id: string) => {
+    ref.current = ref.current.filter((e) => e.item.id !== id);
+    setEntries(ref.current);
+  }, []);
   const setQuantity = useCallback(
-    (id: string, quantity: number) =>
-      setEntries((prev) => prev.map((e) => (e.item.id === id && e.entityType === 'lot' ? { ...e, quantity } : e))),
+    (id: string, quantity: number) => {
+      ref.current = ref.current.map((e) => (e.item.id === id && e.entityType === 'lot' ? { ...e, quantity } : e));
+      setEntries(ref.current);
+    },
     [],
   );
-  const clear = useCallback(() => setEntries([]), []);
+  const clear = useCallback(() => {
+    ref.current = [];
+    setEntries(ref.current);
+  }, []);
 
   const value = useMemo(() => ({ entries, add, remove, setQuantity, clear }), [entries, add, remove, setQuantity, clear]);
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

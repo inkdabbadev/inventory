@@ -9,7 +9,7 @@ import { currentStaff, dashboardStats, recentMovements } from '../../src/service
 import { describeMovement, MOVEMENT_ICON, timeAgo } from '../../src/services/format';
 import { useCart } from '../../src/store/cart';
 import { useToast } from '../../src/components/Toast';
-import { supabase } from '../../src/lib/supabase';
+import { isCloudEnabled } from '../../src/lib/neon';
 import { syncNow } from '../../src/services/sync';
 import { cmyk, colors, gradients, radius, space, type } from '../../src/theme';
 
@@ -34,15 +34,12 @@ export default function Dashboard() {
 
   /** Pull to refresh: syncs with the cloud when signed in, otherwise just reloads. */
   const refresh = async () => {
-    if (supabase) {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        try {
-          const r = await syncNow();
-          toast(`Synced · ↑${r.pushedRows + r.pushedMovements} ↓${r.pulledRows}`);
-        } catch (e) {
-          toast(e instanceof Error ? e.message : String(e), 'error');
-        }
+    if (isCloudEnabled) {
+      try {
+        const r = await syncNow();
+        toast(`Synced · ↑${r.pushedRows + r.pushedMovements} ↓${r.pulledRows}`);
+      } catch (e) {
+        toast(e instanceof Error ? e.message : String(e), 'error');
       }
     }
     reloadStats();

@@ -40,6 +40,7 @@ export interface Product {
   subcategory: string | null;
   unit: string; // pcs, m, box
   notes: string | null;
+  image_key: string | null;
 }
 
 export interface Asset {
@@ -115,6 +116,7 @@ export interface AssetView extends Asset {
   subcategory: string | null;
   location_name: string | null;
   project_name: string | null;
+  image_key: string | null;
 }
 
 export interface LotView extends StockLot {
@@ -125,6 +127,7 @@ export interface LotView extends StockLot {
   category: string | null;
   subcategory: string | null;
   location_name: string | null;
+  image_key: string | null;
 }
 
 export type ScanResult =

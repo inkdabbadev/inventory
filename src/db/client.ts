@@ -3,15 +3,15 @@ import * as SQLite from 'expo-sqlite';
 /**
  * Local SQLite database: the on-device source of truth.
  * Every scan and movement is written here first, so the app works with no network;
- * `src/services/sync.ts` pushes pending changes to Supabase when online.
+ * `src/services/sync.ts` pushes pending changes to Neon when online.
  *
  * Catalog tables carry `dirty = 1` until uploaded. Stock quantity and asset status
  * are never uploaded directly - they change only through movements, which the
- * server re-validates (see supabase/schema.sql `apply_movement`).
+ * server re-validates (see neon/schema.sql `inventory_apply_movement`).
  */
 export const db = SQLite.openDatabaseSync('ink-inventory.db');
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const MIGRATIONS: Record<number, string> = {
   1: `
@@ -142,6 +142,10 @@ const MIGRATIONS: Record<number, string> = {
   5: `
     ALTER TABLE inventory_products ADD COLUMN subcategory TEXT;
     CREATE INDEX IF NOT EXISTS idx_products_cat_sub ON inventory_products(category, subcategory);
+  `,
+  // Product photos live in Neon Object Storage; the database stores only the branch-aware object key.
+  6: `
+    ALTER TABLE inventory_products ADD COLUMN image_key TEXT;
   `,
 };
 

@@ -10,6 +10,7 @@ import type {
   Movement,
   MovementType,
   ProductKind,
+  Product,
   Project,
   ScanResult,
 } from '../domain/types';
@@ -89,14 +90,14 @@ export function identifiersFor(entityType: EntityType, entityId: string) {
 // ---------------------------------------------------------------------------
 
 const ASSET_SELECT = `
-  SELECT a.*, p.name, p.subname, p.unit, p.category, p.subcategory, l.name AS location_name, pr.name AS project_name
+  SELECT a.*, p.name, p.subname, p.unit, p.category, p.subcategory, p.image_key, l.name AS location_name, pr.name AS project_name
   FROM inventory_assets a
   JOIN inventory_products p ON p.id = a.product_id
   LEFT JOIN inventory_locations l ON l.id = a.location_id
   LEFT JOIN inventory_projects pr ON pr.id = a.project_id`;
 
 const LOT_SELECT = `
-  SELECT s.*, p.name, p.subname, p.kind, p.unit, p.category, p.subcategory, l.name AS location_name
+  SELECT s.*, p.name, p.subname, p.kind, p.unit, p.category, p.subcategory, p.image_key, l.name AS location_name
   FROM inventory_stock_lots s
   JOIN inventory_products p ON p.id = s.product_id
   LEFT JOIN inventory_locations l ON l.id = s.location_id`;
@@ -105,6 +106,11 @@ export const getAsset = (id: string) => db.getFirstSync<AssetView>(`${ASSET_SELE
 export const getLot = (id: string) => db.getFirstSync<LotView>(`${LOT_SELECT} WHERE s.id = ?`, id);
 export const getLocation = (id: string) => db.getFirstSync<Location>('SELECT * FROM inventory_locations WHERE id = ?', id);
 export const getProject = (id: string) => db.getFirstSync<Project>('SELECT * FROM inventory_projects WHERE id = ?', id);
+export const getProduct = (id: string) => db.getFirstSync<Product>('SELECT * FROM inventory_products WHERE id = ?', id);
+
+export function setProductImage(productId: string, imageKey: string | null) {
+  db.runSync('UPDATE inventory_products SET image_key=?, updated_at=?, dirty=1 WHERE id=?', imageKey, now(), productId);
+}
 
 /** Resolve any scanned value (QR, barcode, later RFID/NFC) to its record. */
 export function resolveScan(raw: string): ScanResult {
@@ -169,6 +175,28 @@ export function searchInventory(term: string, filter: InventoryFilter, limit = 6
   return { assets, lots, assetTotal, lotTotal };
 }
 
+/** Available assets and positive-balance stock that can be assigned to a project. */
+export function projectAssignableInventory(term: string, limit = 60) {
+  const t = term.trim();
+  const like = `%${t}%`;
+  const codeLike = `${t.toUpperCase()}%`;
+  const textClause = "((p.name || ' ' || IFNULL(p.subname,'')) LIKE ? OR $CODE LIKE ? OR (IFNULL(p.category,'') || ' ' || IFNULL(p.subcategory,'')) LIKE ?)";
+  const assetWhere = `a.status = 'available'${t ? ` AND ${textClause.replace('$CODE', 'a.code')}` : ''}`;
+  const lotWhere = `s.quantity > 0${t ? ` AND ${textClause.replace('$CODE', 's.code')}` : ''}`;
+  const params = t ? [like, codeLike, like] : [];
+  const assets = db.getAllSync<AssetView>(`${ASSET_SELECT} WHERE ${assetWhere} ORDER BY p.name, a.code LIMIT ?`, ...params, limit);
+  const lots = db.getAllSync<LotView>(`${LOT_SELECT} WHERE ${lotWhere} ORDER BY p.name, s.code LIMIT ?`, ...params, limit);
+  const assetTotal = db.getFirstSync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM inventory_assets a JOIN inventory_products p ON p.id=a.product_id WHERE ${assetWhere}`,
+    ...params,
+  )?.n ?? 0;
+  const lotTotal = db.getFirstSync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM inventory_stock_lots s JOIN inventory_products p ON p.id=s.product_id WHERE ${lotWhere}`,
+    ...params,
+  )?.n ?? 0;
+  return { assets, lots, assetTotal, lotTotal };
+}
+
 export function dashboardStats() {
   const row = db.getFirstSync<Record<string, number>>(`
     SELECT
@@ -208,6 +236,27 @@ export const locationContents = (locationId: string) => ({
 
 export const projectAssets = (projectId: string) =>
   db.getAllSync<AssetView>(`${ASSET_SELECT} WHERE a.project_id = ? AND a.status = 'checked_out' ORDER BY a.code`, projectId);
+
+export type ProjectStockUsage = {
+  lot_id: string;
+  code: string;
+  name: string;
+  subname: string | null;
+  unit: string;
+  allocated: number;
+  available: number;
+};
+
+/** Stock taken for a project, grouped by lot. The lot balance remains available to other projects. */
+export const projectStockUsage = (projectId: string) => db.getAllSync<ProjectStockUsage>(`
+  SELECT s.id AS lot_id, s.code, p.name, p.subname, p.unit,
+         SUM(m.quantity) AS allocated, s.quantity AS available
+  FROM inventory_movements m
+  JOIN inventory_stock_lots s ON m.entity_type='lot' AND s.id=m.entity_id
+  JOIN inventory_products p ON p.id=s.product_id
+  WHERE m.project_id=? AND m.type='consume'
+  GROUP BY s.id, s.code, p.name, p.subname, p.unit, s.quantity
+  ORDER BY p.name, p.subname, s.code`, projectId);
 
 export type MovementView = Movement & { label: string; project_name: string | null; to_location_name: string | null; unit: string };
 
@@ -254,6 +303,8 @@ export interface NewItemInput {
   batch?: string;
   supplier?: string;
   barcode?: string;
+  /** Object key in the private Neon `assets` bucket. */
+  imageKey?: string;
 }
 
 type CreatedItem = { entityType: 'asset' | 'lot'; ids: string[] };
@@ -304,9 +355,11 @@ function createItemTx(input: NewItemInput): CreatedItem {
     const productId = existing?.id ?? newId();
     if (!existing) {
       db.runSync(
-        'INSERT INTO inventory_products (id, name, subname, kind, prefix, category, subcategory, unit, notes, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
-        productId, name, subname, input.kind, prefix, input.category?.trim() || null, subcategory, unit, input.notes?.trim() || null, ts,
+        'INSERT INTO inventory_products (id, name, subname, kind, prefix, category, subcategory, unit, notes, image_key, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        productId, name, subname, input.kind, prefix, input.category?.trim() || null, subcategory, unit, input.notes?.trim() || null, input.imageKey ?? null, ts,
       );
+    } else if (input.imageKey) {
+      db.runSync('UPDATE inventory_products SET image_key=?, updated_at=?, dirty=1 WHERE id=?', input.imageKey, ts, productId);
     }
 
     if (input.kind === 'asset') {

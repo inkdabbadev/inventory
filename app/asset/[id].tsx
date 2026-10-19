@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Card, Empty, IconBubble, Screen, StatusBadge, type IconName } from '../../src/components/ui';
+import { Button, Card, Empty, IconBubble, Screen, StatusBadge, type IconName } from '../../src/components/ui';
 import { ActionTile, HistoryList, IdentityCard, InfoLine } from '../../src/components/ItemParts';
 import { useToast } from '../../src/components/Toast';
 import { useFocusQuery } from '../../src/hooks/useRefresh';
@@ -8,6 +8,7 @@ import { categoryPath, fullName, getAsset, history } from '../../src/services/in
 import { useCart } from '../../src/store/cart';
 import { groupStyle } from '../../src/domain/taxonomy';
 import { cmyk, colors, space, type } from '../../src/theme';
+import { ProductImage } from '../../src/components/ProductImage';
 
 export default function AssetDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +32,9 @@ export default function AssetDetail() {
     <Screen>
       <Stack.Screen options={{ title: asset.code }} />
       <Card>
+        {asset.image_key ? (
+          <ProductImage imageKey={asset.image_key} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: space.md, backgroundColor: colors.surfaceStrong }} />
+        ) : null}
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
           <IconBubble icon={groupStyle(asset.category).icon} color={groupStyle(asset.category).color} size={52} />
           <View style={{ flex: 1 }}>
@@ -50,6 +54,7 @@ export default function AssetDetail() {
         <InfoLine icon="person-outline" label="Issued by" value={asset.holder} />
         <InfoLine icon="calendar-outline" label="Due back" value={asset.expected_return ? `${asset.expected_return}${overdue ? ' · overdue' : ''}` : null} />
       </Card>
+      <Button title={asset.image_key ? 'Change product image' : 'Add product image'} icon="camera-outline" variant="secondary" onPress={() => router.push(`/product-photo?productId=${asset.product_id}`)} style={{ marginBottom: space.sm }} />
 
       <View style={{ flexDirection: 'row', gap: space.sm, marginBottom: space.sm }}>
         <ActionTile icon={primary.icon} label={primary.label} color={primary.color} onPress={() => act(primary.action)} />

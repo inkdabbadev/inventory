@@ -14,7 +14,7 @@ import { cmyk, colors, space, type } from '../src/theme';
 
 const META: Record<string, { title: string; icon: IconName; color: string; done: string }> = {
   issue: { title: 'Issue', icon: 'arrow-up', color: cmyk.cyan, done: 'Issued' },
-  return: { title: 'Return', icon: 'arrow-down', color: colors.success, done: 'Returned' },
+  return: { title: 'Return to inventory', icon: 'arrow-down', color: colors.success, done: 'Returned' },
   transfer: { title: 'Transfer', icon: 'swap-horizontal', color: cmyk.magenta, done: 'Moved' },
   maintenance: { title: 'Send to maintenance', icon: 'construct', color: colors.error, done: 'Sent to maintenance' },
   restore: { title: 'Back in service', icon: 'checkmark-done', color: colors.success, done: 'Back in service' },
@@ -40,7 +40,7 @@ const plusDays = (n: number) => {
  * multi-scan cart as a single all-or-nothing transaction.
  */
 export default function ActionScreen() {
-  const p = useLocalSearchParams<{ action: MovementType; entityType?: 'asset' | 'lot'; id?: string; cart?: string }>();
+  const p = useLocalSearchParams<{ action: MovementType; entityType?: 'asset' | 'lot'; id?: string; cart?: string; projectId?: string }>();
   const action = p.action;
   const meta = META[action] ?? META.issue;
   const cart = useCart();
@@ -53,7 +53,7 @@ export default function ActionScreen() {
     return p.entityType === 'asset' ? getAsset(p.id) : getLot(p.id);
   }, [fromCart, p.entityType, p.id]);
 
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(p.projectId ?? null);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [expectedReturn, setExpectedReturn] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -91,7 +91,7 @@ export default function ActionScreen() {
     }
   };
 
-  const needsProject = action === 'issue' && (fromCart ? cart.entries.some((e) => e.entityType === 'asset') : !isLot);
+  const needsProject = action === 'issue' || action === 'consume';
   const blocked = (needsProject && !projectId) || (needsQty && !(qtyNum > 0) && action !== 'adjust') || (fromCart && cart.entries.length === 0);
   const sheetTop = Platform.OS === 'ios' ? space.md : insets.top + space.sm; // iOS sheet has no status bar
 
@@ -103,7 +103,11 @@ export default function ActionScreen() {
         top={sheetTop}
         footer={
           <Button
-            title={fromCart ? `${meta.title} ${cart.entries.length} item${cart.entries.length === 1 ? '' : 's'}` : `Confirm ${meta.title.toLowerCase()}`}
+            title={fromCart
+              ? action === 'return'
+                ? `Return ${cart.entries.length} to inventory`
+                : `${meta.title} ${cart.entries.length} item${cart.entries.length === 1 ? '' : 's'}`
+              : `Confirm ${meta.title.toLowerCase()}`}
             icon={meta.icon}
             onPress={submit}
             disabled={blocked}

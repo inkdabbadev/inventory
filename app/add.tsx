@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { Button, Card, Chips, Field, hexA, Label, Screen, Segmented, Stepper } from '../src/components/ui';
 import { CategoryPicker, VariantChips } from '../src/components/CategoryPicker';
 import { codePrefixFor, findTaxonomy, Subcategory } from '../src/domain/taxonomy';
@@ -9,9 +10,11 @@ import { LocationPicker } from '../src/components/pickers';
 import { useToast } from '../src/components/Toast';
 import { categoryPath, createItem, derivePrefix, fullName, getAsset, getLot, InventoryError, nextItemCode, qrValueFor } from '../src/services/inventory';
 import { printLabels } from '../src/lib/labels';
+import { uploadProductImage } from '../src/lib/neon';
 import { colors, space, type } from '../src/theme';
 
 type Track = 'each' | 'quantity';
+type PickedPhoto = { uri: string; base64: string; contentType: string };
 
 /** 'Cables' + 'HDMI' -> 'HDMI cable'; 'Loose wire (by metre)' -> 'Loose wire'; others use the type name. */
 function defaultName(category: string, sub: string) {
@@ -44,6 +47,7 @@ export default function AddItem() {
   const [barcode, setBarcode] = useState(scannedBarcode ?? '');
   const [supplier, setSupplier] = useState('');
   const [saving, setSaving] = useState(false);
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
 
   const codePrefix = prefix || codePrefixFor(category, subcategory) || derivePrefix(name) || 'ITEM';
   const firstCode = useMemo(() => nextItemCode(codePrefix), [codePrefix]);
@@ -62,13 +66,34 @@ export default function AddItem() {
     }
   };
 
-  const save = () => {
+  const handlePickerResult = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset.base64) return toast('Could not read that image. Please choose another.', 'error');
+    // Expo returns the requested base64 payload as JPEG data even when the source was HEIC.
+    setPhoto({ uri: asset.uri, base64: asset.base64, contentType: 'image/jpeg' });
+  };
+
+  const choosePhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.7, base64: true });
+    handlePickerResult(result);
+  };
+
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return Alert.alert('Camera permission needed', 'Allow camera access to take a product photo.');
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.7, base64: true });
+    handlePickerResult(result);
+  };
+
+  const save = async () => {
     setSaving(true);
     try {
+      const imageKey = photo ? await uploadProductImage(photo.base64, photo.contentType) : undefined;
       const result = createItem({
         name, subname, category, subcategory, kind, prefix: prefix || undefined, locationId,
         count: pieces, quantity: Number(quantity.replace(',', '.')) || 0, unit, supplier,
-        barcode: barcode.trim() || undefined,
+        barcode: barcode.trim() || undefined, imageKey,
       });
       const labels = result.ids.map((id) => {
         const item = result.entityType === 'asset' ? getAsset(id)! : getLot(id)!;
@@ -116,6 +141,23 @@ export default function AddItem() {
               {firstCode}{track === 'each' && pieces > 1 ? ` … +${pieces - 1}` : ''}
             </Text>
           </View>
+        </Card>
+
+        <Card>
+          <Text style={[type.overline, { marginBottom: space.sm }]}>Product image</Text>
+          {photo ? (
+            <Image source={{ uri: photo.uri }} style={styles.photo} resizeMode="cover" />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Ionicons name="image-outline" size={36} color={colors.textFaint} />
+              <Text style={type.caption}>Add a photo to identify this product</Text>
+            </View>
+          )}
+          <View style={styles.photoActions}>
+            <Button title="Camera" icon="camera-outline" variant="secondary" compact onPress={takePhoto} style={{ flex: 1 }} />
+            <Button title="Gallery" icon="images-outline" variant="secondary" compact onPress={choosePhoto} style={{ flex: 1 }} />
+          </View>
+          {photo ? <Button title="Remove photo" icon="trash-outline" variant="ghost" compact onPress={() => setPhoto(null)} /> : null}
         </Card>
 
         <Card>
@@ -182,3 +224,9 @@ export default function AddItem() {
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  photo: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, backgroundColor: colors.surfaceStrong },
+  photoPlaceholder: { width: '100%', aspectRatio: 4 / 3, borderRadius: 14, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center', gap: space.sm },
+  photoActions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
+});

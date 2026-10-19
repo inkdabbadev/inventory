@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Card, Empty, IconBubble, Screen, StatusBadge } from '../../src/components/ui';
+import { Button, Card, Empty, IconBubble, Screen, StatusBadge } from '../../src/components/ui';
 import { ActionTile, HistoryList, IdentityCard, InfoLine } from '../../src/components/ItemParts';
 import { useToast } from '../../src/components/Toast';
 import { useFocusQuery } from '../../src/hooks/useRefresh';
@@ -8,6 +8,7 @@ import { categoryPath, fmtQty, fullName, getLot, history } from '../../src/servi
 import { useCart } from '../../src/store/cart';
 import { groupStyle } from '../../src/domain/taxonomy';
 import { cmyk, colors, space, type } from '../../src/theme';
+import { ProductImage } from '../../src/components/ProductImage';
 
 export default function LotDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +29,9 @@ export default function LotDetail() {
     <Screen>
       <Stack.Screen options={{ title: lot.code }} />
       <Card>
+        {lot.image_key ? (
+          <ProductImage imageKey={lot.image_key} style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: 14, marginBottom: space.md, backgroundColor: colors.surfaceStrong }} />
+        ) : null}
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
           <IconBubble icon={groupStyle(lot.category).icon} color={groupStyle(lot.category).color} size={52} />
           <View style={{ flex: 1 }}>
@@ -51,6 +55,7 @@ export default function LotDetail() {
         <InfoLine icon="file-tray-stacked-outline" label="Batch" value={lot.batch} />
         <InfoLine icon="calendar-outline" label="Purchased" value={lot.purchase_date} />
       </Card>
+      <Button title={lot.image_key ? 'Change product image' : 'Add product image'} icon="camera-outline" variant="secondary" onPress={() => router.push(`/product-photo?productId=${lot.product_id}`)} style={{ marginBottom: space.sm }} />
 
       <View style={{ flexDirection: 'row', gap: space.sm, marginBottom: space.sm }}>
         <ActionTile icon="remove" label={lot.kind === 'consumable' ? 'Use' : 'Take'} color={cmyk.cyan} onPress={() => act('consume')} disabled={lot.quantity <= 0} />
