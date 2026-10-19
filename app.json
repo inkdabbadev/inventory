@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "INK Inventory",
+    "slug": "inkdabba-inventory",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.inkdabba.inventory",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#07070C",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.inkdabba.inventory"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-sharing",
+      "expo-status-bar",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "INK Inventory uses the camera to scan QR codes and barcodes on items and shelves."
+        }
+      ],
+      "expo-font"
+    ],
+    "scheme": "inkinventory",
+    "backgroundColor": "#07070C"
+  }
+}
